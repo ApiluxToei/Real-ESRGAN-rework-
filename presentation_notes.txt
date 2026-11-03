@@ -1,0 +1,88 @@
+=== SLIDE 1 ===
+Real-ESRGAN
+ฟื้นฟูภาพความละเอียดต่ำในโลกจริง (Blind Super-Resolution)
+ ด้วยการใช้ข้อมูลสังเคราะห์ล้วน (Pure Synthetic Data)
+
+=== SLIDE 2 ===
+•
+โมเดล Super-Resolution (SR) แบบดั้งเดิมมักสมมติว่าภาพเกิดจาก Bicubic Downsampling ในอุดมคติ
+•
+ในโลกแห่งความเป็นจริง ภาพมีความเสื่อมสภาพที่ซับซ้อนมาก เช่น เลนส์เบลอ, เซนเซอร์มี Noise หรือถูกบีบอัดด้วย JPEG
+•
+โมเดลเดิมเมื่อนำมาใช้กับภาพถ่ายทั่วไปมักไม่สามารถให้ผลลัพธ์ที่ดีได้ และไม่ตอบโจทย์การใช้งานจริง
+ปัญหาของ Super-Resolution
+
+=== SLIDE 3 ===
+แบบ Classical (1st-Order)
+การจำลองแบบเดิมใช้กระบวนการพื้นฐานแบบรอบเดียว เช่น ทำภาพเบลอ > ลดขนาดภาพ > ใส่ Noise > บีบอัด JPEG
+ปัญหา: ไม่เพียงพอที่จะจำลองกระบวนการที่ภาพถูกปรับแต่งหรือส่งต่อผ่านอินเทอร์เน็ตหลายๆ ครั้ง
+แบบ High-Order (Real-ESRGAN)
+การจำลองระดับสูงที่ทำงานซ้อนกันหลายรอบ (เช่น Second-Order) เลียนแบบการใช้งานจริง
+ผลลัพธ์: โมเดลสามารถครอบคลุมรูปแบบความเสื่อมสภาพของภาพได้กว้างขึ้นและแก้ไขภาพจริงได้ดียิ่งขึ้น
+การจำลองความเสื่อมสภาพ
+
+=== SLIDE 4 ===
+•
+ภาพที่ถูกปรับความคมชัดมากเกินไปหรือบีบอัด มักเกิดปัญหา Ringing และ Overshoot Artifacts (ขอบภาพเกิดแสงเงาซ้อน)
+•
+Real-ESRGAN ใช้ Sinc Filter (ตัวกรองที่ตัดความถี่สูง) สร้าง Artifacts เหล่านี้ขึ้นมาระหว่างขั้นตอนสังเคราะห์ข้อมูล
+•
+โมเดลจึงเรียนรู้วิธีลบขอบภาพที่ผิดเพี้ยนเหล่านี้ออกไปได้อย่างหมดจด
+จัดการ Ringing & Overshoot
+
+=== SLIDE 5 ===
+ESRGAN Generator
+ประมวลผลผ่าน RRDB blocks แต่เสริมด้วย Pixel-Unshuffle เพื่อลดขนาดมิติและประหยัดหน่วยความจำ
+U-Net Discriminator
+เปลี่ยนจาก VGG-style เป็น U-Net เพื่อให้โมเดลประเมินภาพและป้อนกลับข้อมูลความสมจริงได้ลึกถึงระดับพิกเซล
+Spectral Normalization
+เพิ่ม SN (Spectral Normalization) ช่วยรักษาเสถียรภาพขณะเทรนโมเดลแบบ GAN ลดอาการภาพคมชัดหลอกตา
+การปรับปรุงโครงสร้าง
+
+=== SLIDE 6 ===
+ขั้นที่ 1: เตรียมข้อมูล
+สร้างข้อมูลจำลอง High-Order และ Sinc filter อย่างต่อเนื่องระหว่างการเทรน (On the fly)
+ขั้นที่ 2: Real-ESRNet
+เทรนโมเดลขั้นต้น (PSNR-oriented) ด้วย L1 Loss สำหรับเป็นฐานที่เสถียร
+ขั้นที่ 3: Real-ESRGAN
+เทรนขั้นสูงด้วยส่วนผสมของ L1 Loss, Perceptual Loss และ GAN Loss
+ขั้นที่ 4: EMA
+ใช้ Exponential Moving Average เพื่อปรับให้ผลลัพธ์โมเดลนิ่งและมีประสิทธิภาพที่สุด
+ขั้นตอนการฝึกสอนโมเดล
+
+=== SLIDE 7 ===
+ภาพต้นฉบับ: ความละเอียดต่ำ มีรอยแตกและเบลอสูง
+โมเดลเดิม: ขยายได้แต่ยังคงทิ้งร่องรอย Artifacts
+Real-ESRGAN: คมชัด ฟื้นฟูรายละเอียดได้อย่างสมจริง
+เปรียบเทียบผลลัพธ์
+
+=== SLIDE 8 ===
+ปัญหาเส้นที่บิดเบี้ยว (Aliasing): โมเดลยังคงมีปัญหากับโครงสร้างพื้นผิวบางประเภท เช่น เส้นของอาคาร อาจก่อให้เกิดความบิดเบี้ยวได้
+ความผิดเพี้ยนจากการเทรน GAN: ในภาพต้นฉบับที่มีโครงสร้างซับซ้อนมาก โมเดลอาจสร้างพื้นผิวปลอม (Artifacts) ที่หลอกตาขึ้นมา
+Out-of-Distribution: หากเผชิญกับความเสื่อมสภาพที่หลุดออกจากขอบเขตข้อมูลที่จำลอง (Synthetic Space) โมเดลก็อาจจะไม่สามารถฟื้นฟูภาพได้อย่างเต็มที่
+ข้อจำกัดของโมเดล
+
+=== SLIDE 9 ===
+Real-ESRGAN ขยายขีดความสามารถของการฟื้นฟูภาพในชีวิตจริงด้วยการสร้างข้อมูลจำลองความเสื่อมสภาพระดับสูง (High-Order) ทำให้การใช้งานจริงทรงพลังยิ่งขึ้น
+จากบทสรุปงานวิจัย Real-ESRGAN (2021)
+"
+"
+บทสรุป
+
+=== SLIDE 10 ===
+คำถามและข้อสงสัย?
+ขอขอบคุณที่รับฟังการบรรยาย
+
+=== SLIDE 11 ===
+https://cdn.kustomerhostedcontent.com/media/5bae8f0703e5a6b22a06e029/261bbc80edfabbccf8c1f2cfd34355e5.png
+Source: help.mixbook.com
+https://images.squarespace-cdn.com/content/v1/5add221696e76ff6bdc6d08b/1534613170643-AJJ4JEZ4K3MZ874BPQNV/Edge+Enhancement.jpg
+Source: bobpariseau.com
+https://www.sammapix.com/demo/upscale-original.jpg
+Source: www.sammapix.com
+https://wildmacro.de/wp-content/uploads/banner-blurry-background-macro-1024x418.jpg
+Source: wildmacro.de
+https://popsa.com/_next/image/?url=https%3A%2F%2Fa.storyblok.com%2Ff%2F284216%2F1440x720%2Fff539239e9%2Fmacro-butterfly-android.png%2Fm%2F663x663&w=828&q=75
+Source: popsa.com
+Image Sources
+

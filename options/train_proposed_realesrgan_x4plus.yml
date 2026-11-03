@@ -1,0 +1,167 @@
+# ===================================================================================== #
+# Proposed Model Configuration: Real-ESRGAN Fine-tuning for Superior Benchmark Metrics
+# Targeted for: Lower LPIPS (< 0.2349), Lower NIQE (< 4.746), Higher MUSIQ (> 64.58)
+# Optimized for: NVIDIA RTX 2060 (6GB VRAM)
+# ===================================================================================== #
+
+# general settings
+name: proposed_RealESRGAN_x4plus
+model_type: RealESRGANModel
+scale: 4
+num_gpu: 1
+manual_seed: 0
+
+# ----------------- options for synthesizing training data in RealESRGANModel ----------------- #
+# USM sharpening on ground-truth to boost high-frequency features (enhances MUSIQ & NIQE)
+l1_gt_usm: True
+percep_gt_usm: True
+gan_gt_usm: False
+
+# the first degradation process
+resize_prob: [0.2, 0.7, 0.1]  # up, down, keep
+resize_range: [0.15, 1.5]
+gaussian_noise_prob: 0.5
+noise_range: [1, 25]
+poisson_scale_range: [0.05, 2.5]
+gray_noise_prob: 0.4
+jpeg_range: [15, 85]          # Strengthened compression simulation
+
+# the second degradation process
+second_blur_prob: 0.8
+resize_prob2: [0.3, 0.4, 0.3]  # up, down, keep
+resize_range2: [0.3, 1.2]
+gaussian_noise_prob2: 0.5
+noise_range2: [1, 20]
+poisson_scale_range2: [0.05, 2.0]
+gray_noise_prob2: 0.4
+jpeg_range2: [15, 85]
+
+gt_size: 192                  # Adjusted for 6GB VRAM stability
+queue_size: 32                # Divisible by batch size 4 and memory-safe
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: Custom_HR
+    type: RealESRGANDataset
+    dataroot_gt: datasets/train_HR
+    meta_info: datasets/train_HR/meta_info.txt
+    io_backend:
+      type: disk
+
+    blur_kernel_size: 21
+    kernel_list: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
+    kernel_prob: [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
+    sinc_prob: 0.15           # Slightly increased sinc filter probability for ringing removal
+    blur_sigma: [0.2, 3]
+    betag_range: [0.5, 4]
+    betap_range: [1, 2]
+
+    blur_kernel_size2: 21
+    kernel_list2: ['iso', 'aniso', 'generalized_iso', 'generalized_aniso', 'plateau_iso', 'plateau_aniso']
+    kernel_prob2: [0.45, 0.25, 0.12, 0.03, 0.12, 0.03]
+    sinc_prob2: 0.15
+    blur_sigma2: [0.2, 1.5]
+    betag_range2: [0.5, 4]
+    betap_range2: [1, 2]
+
+    final_sinc_prob: 0.8
+
+    gt_size: 192
+    use_hflip: True
+    use_rot: False
+
+    # data loader
+    use_shuffle: true
+    num_worker_per_gpu: 0     # 0 avoids worker subprocess memory leak on Windows
+    batch_size_per_gpu: 4     # Optimized batch size for RTX 2060 6GB
+    dataset_enlarge_ratio: 1
+    prefetch_mode: ~
+
+# network structures
+network_g:
+  type: RRDBNet
+  num_in_ch: 3
+  num_out_ch: 3
+  num_feat: 64
+  num_block: 23
+  num_grow_ch: 32
+
+network_d:
+  type: UNetDiscriminatorSN
+  num_in_ch: 3
+  num_feat: 64
+  skip_connection: True
+
+# path
+path:
+  # Initialize directly from the official Real-ESRGAN checkpoint to start at baseline scores
+  pretrain_network_g: experiments/pretrained_models/RealESRGAN_x4plus.pth
+  param_key_g: params_ema
+  strict_load_g: true
+  pretrain_network_d: experiments/pretrained_models/RealESRGAN_x4plus_netD.pth
+  param_key_d: params
+  strict_load_d: true
+  resume_state: ~
+
+# training settings
+train:
+  ema_decay: 0.999
+  optim_g:
+    type: Adam
+    lr: !!float 5e-5          # Fine-tuning learning rate (gentle refinement)
+    weight_decay: 0
+    betas: [0.9, 0.99]
+  optim_d:
+    type: Adam
+    lr: !!float 5e-5
+    weight_decay: 0
+    betas: [0.9, 0.99]
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [20000, 40000]
+    gamma: 0.5
+
+  total_iter: 50000
+  warmup_iter: -1
+
+  # Proposed Balanced Losses to overcome over-smoothing & push LPIPS/NIQE/MUSIQ
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 0.8          # Lowered from 1.0 to reduce over-smoothing bias
+    reduction: mean
+
+  perceptual_opt:
+    type: PerceptualLoss
+    layer_weights:
+      'conv1_2': 0.1
+      'conv2_2': 0.1
+      'conv3_4': 1.0
+      'conv4_4': 1.0
+      'conv5_4': 1.0
+    vgg_type: vgg19
+    use_input_norm: true
+    perceptual_weight: !!float 1.0
+    style_weight: 0
+    range_norm: false
+    criterion: l1
+
+  gan_opt:
+    type: GANLoss
+    gan_type: vanilla
+    real_label_val: 1.0
+    fake_label_val: 0.0
+    loss_weight: !!float 0.15  # Increased from 0.1 to boost high-frequency realism (MUSIQ/NIQE)
+
+  net_d_iters: 1
+  net_d_init_iters: 0
+
+# logging settings
+logger:
+  print_freq: 50
+  save_checkpoint_freq: !!float 1000
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
