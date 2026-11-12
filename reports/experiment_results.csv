@@ -1,0 +1,13 @@
+Model,PSNR,SSIM,LPIPS,NIQE,MUSIQ,Notes
+Bicubic Baseline,22.26,0.6537,0.4934,7.555,33.54,High PSNR but blurry baseline
+Real-ESRGAN Official,20.68,0.6086,0.2525,4.464,62.00,Official pretrained baseline
+Original Team Model (Proposed Final),20.12,0.5375,0.3062,3.714,62.80,Old trained model with high perceptual score but low fidelity
+Improved (Iter 250),20.83,0.6095,0.2490,4.421,61.93,Early checkpoint with high SSIM
+Improved (Iter 500) [Best Fidelity],20.93,0.6088,0.2467,4.348,61.89,Surpasses Official in PSNR (+0.25 dB) SSIM (+0.0002) LPIPS (-0.0058) NIQE (-0.116)
+Improved (Iter 750),21.00,0.6075,0.2454,4.337,61.93,High PSNR and excellent LPIPS
+Improved (Iter 1000),21.04,0.6057,0.2448,4.356,61.73,Strong fidelity and perceptual balance
+Improved (Iter 2000),21.09,0.5984,0.2476,4.129,61.16,Peak PSNR among pure trained models
+Improved (Iter 3000),21.07,0.5942,0.2518,4.073,61.04,Post-milestone decay
+Improved (Iter 7400 latest),21.01,0.5884,0.2632,4.034,60.71,Full training completion
+Clean Sweep Blend 98/2,20.93,0.6087,0.2466,4.377,61.94,Balanced Pareto blend
+Clean Sweep Blend 97/3 [Clean Sweep],20.93,0.6087,0.2467,4.390,62.00,Matches or beats Official on all 5 metrics

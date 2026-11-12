@@ -26,6 +26,15 @@ class RealESRGANModel(SRGANModel):
         self.usm_sharpener = USMSharp().cuda()  # do usm sharpening
         self.queue_size = opt.get('queue_size', 180)
 
+        # Initialize optional structural loss (e.g. SSIMLoss)
+        train_opt = opt.get('train', {})
+        if self.is_train and train_opt.get('structural_opt'):
+            from basicsr.losses import build_loss
+            import realesrgan.models.structural_loss  # ensure registered
+            self.cri_struct = build_loss(train_opt['structural_opt']).to(self.device)
+        else:
+            self.cri_struct = None
+
     @torch.no_grad()
     def _dequeue_and_enqueue(self):
         """It is the training pair pool for increasing the diversity in a batch.
@@ -224,6 +233,11 @@ class RealESRGANModel(SRGANModel):
                 if l_g_style is not None:
                     l_g_total += l_g_style
                     loss_dict['l_g_style'] = l_g_style
+            # structural loss (SSIM / MS-SSIM on unsharpened GT)
+            if hasattr(self, 'cri_struct') and self.cri_struct:
+                l_g_struct = self.cri_struct(self.output, self.gt)
+                l_g_total += l_g_struct
+                loss_dict['l_g_struct'] = l_g_struct
             # gan loss
             fake_g_pred = self.net_d(self.output)
             l_g_gan = self.cri_gan(fake_g_pred, True, is_disc=False)
